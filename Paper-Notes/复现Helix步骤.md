@@ -1,139 +1,170 @@
-针对你的 **AutoDL 无卡模式 + 模拟器复现** 目标，我为你整理了一份保姆级操作指南。Helix 的模拟器是用纯 Python 写的，不涉及复杂的 CUDA 编译，非常适合这种环境。
-以下是具体步骤：
-### 第一步：租用 AutoDL 实例
+### 第一阶段：依赖安装 (Installing Dependencies)
 
-1. **登录 AutoDL 控制台** -> 点击 **“算力市场”**。
+这是最关键的一步。很多时候报错是因为没有在根目录安装项目本身。
+
+1. 进入项目根目录
     
-2. **选择配置**：
+    确保你现在的路径是 /root/autodl-tmp/workspace/Helix-ASPLOS25。
     
-    - **计算卡**：选择 **“无卡模式”** (CPU)。
-        
-    - **内存**：这是最关键的指标。论文建议 **至少 32GB 内存** 以支持大规模集群模拟 1。在无卡模式下，内存通常很便宜，建议直接筛选 **30GB 以上** 的实例。
-        
-    - **CPU**：Gurobi 求解器依赖 CPU 性能，建议选择核心数较多（如 8核+）的实例。
-        
-3. **选择镜像**：
+    Bash
     
-    - 点击“基础镜像”。
-        
-    - 选择 **Miniconda** -> **Python 3.10** (论文明确推荐 Python 3.10 2) -> **Ubuntu 20.04** 或 **22.04**。
-        
-4. **创建实例** 并等待启动。
+    ```
+    cd ~/autodl-tmp/workspace/Helix-ASPLOS25
+    ```
     
----
-### 第二步：环境配置 (在 AutoDL 终端操作)
-
-实例启动后，点击 **“JupyterLab”** 进入，打开 **“终端 (Terminal)”**，依次执行以下命令：
-
-1. 初始化 Conda 环境
-
-虽然镜像自带 Python，但为了隔离环境（这也是论文推荐的做法 3），我们新建一个环境：
-
-Bash
-```
-# 初始化 conda（如果是新开的机子可能需要）
-conda init bash
-source ~/.bashrc
-
-# 创建名为 helix 的环境，指定 Python 3.10
-conda create -n helix python=3.10 -y
-
-# 激活环境
-conda activate helix
-```
-
-2. 拉取你的代码
-
-这里记得替换成你 Fork 后的仓库地址，方便你后续修改并提交笔记：
-
-Bash
-
-```
-# 务必替换成你的 GitHub 用户名
-git clone https://github.com/<你的用户名>/Helix-ASPLOS25.git
-
-# 进入目录
-cd Helix-ASPLOS25
-```
-
-_(如果 GitHub 拉取太慢，可以在 AutoDL 开启学术加速：`source /etc/network_turbo`)_
-
-3. 安装依赖
-
-根据论文描述，模拟器主要依赖 networkx, matplotlib, gurobipy 4。我们直接安装：
-
-Bash
-
-```
-# 安装核心依赖
-pip install networkx matplotlib gurobipy pandas tqdm
-
-# 解释：
-# - gurobipy: 数学规划求解器核心
-# - networkx: 用于构建论文提到的图抽象（Graph Abstraction）
-# - pandas/tqdm: 虽然论文未显式列出，但处理 Trace 数据通常需要这些工具
-```
-
----
-
-### 第三步：运行模拟器
-
-根据论文描述，模拟器代码位于仓库中。通常入口脚本在 `simulator` 目录下。
-
-1. 确认目录结构
-
-先看一眼文件结构：
-
-Bash
-
-```
-ls -R
-```
-
-你应该能看到类似 `simulator/` 的文件夹。
-
-2. 运行基础示例
-
-论文提到仓库中包含示例代码 5。通常复现的第一步是跑通这个默认示例，它不需要额外的 Gurobi License：
-
-Bash
-
-```
-# 假设入口文件在 simulator 目录下（具体文件名以你 ls 看到的为准）
-# 常见的入口可能是 run_simulation.py 或 main.py
-python simulator/trace_simulator.py 
-```
-
-_(注意：如果代码报错提示找不到模块，可能需要手动将当前目录加入 PYTHONPATH: `export PYTHONPATH=$PYTHONPATH:.`)_
-
-3. 调整参数（进阶）
-
-Helix 的模拟器允许你配置集群大小和网络带宽。你可以在代码中找到定义 Cluster 的部分（通常是 JSON 配置文件或 Python 字典），尝试修改：
-
-- **节点数量**：从默认的小规模改大（注意 Gurobi License 限制）。
+2. 准备环境
     
-- **带宽参数**：论文中提到了 `10 Gbps` 和 `100 Mbps` 的场景 6666，你可以搜索这些数值并进行修改，观察吞吐量变化。
+    README 推荐创建一个名为 runtime 的环境。如果你之前已经创建了名为 helix 的环境，直接激活即可，不用新建。
+    
+    Bash
+    
+    ```
+    # 如果你之前没创建环境，用这个命令：
+    conda create -n runtime python=3.10 -y
+    conda activate runtime
+    
+    # 如果你之前已经创建了名为 helix 的环境，用这个：
+    # conda activate helix
+    ```
+    
+3. 安装项目依赖 (关键步骤)
+    
+    README 中提到 pip install -e .。这一步会将当前的 Helix 文件夹作为一个 Python 包安装，这样代码里的 import simulator 才能生效。
+    
+    Bash
+    
+    ```
+    # 必须在 Helix-ASPLOS25 根目录下执行
+    pip install -e .
+    ```
+    
+    _等待安装完成，这会自动安装 numpy, networkx, gurobipy 等依赖。_
     
 
 ---
 
-### 第四步：避坑指南 (Gurobi License)
+### 第二阶段：运行模拟器 (Running the Simulator)
 
-你在运行过程中最可能遇到的报错是 **Gurobi License Error**。
+根据 README，所有的模拟器操作都在 `examples/simulation` 目录下进行。
 
-- **现象**：程序报错提示 "Model too large for size-limited license"。
+1. **进入示例目录**
     
-- **原因**：论文中提到，如果不申请 License，只能运行小规模问题 7。默认安装的 `gurobipy` 是受限版（限制变量和约束的数量）。
+    Bash
     
-- **解决方案**：
+    ```
+    cd examples/simulation
+    ```
     
-    - **方案 A (推荐)**：先只跑代码库自带的 Demo，那个通常在限制范围内。
+2. 步骤 1：生成集群配置 (Generate Configuration Files)
+    
+    这一步会生成模拟的“机器”和“网络拓扑”。
+    
+    Bash
+    
+    ```
+    python step1_gen_cluster.py
+    ```
+    
+    _执行后，查看 `config` 文件夹，应该会生成 `single24.ini` 和 `3cluster24.ini` 等文件。_
+    
+3. 步骤 2：生成模型放置方案 (Finding Model Placement Plans)
+    
+    这是核心算法部分。README 提到有两种方法：启发式（快）和 MILP（慢，需要 Gurobi）。
+    
+    - 先运行启发式方法 (推荐)：
         
-    - **方案 B (修改代码)**：找到代码中设置节点数量的地方（比如 `num_nodes`），把它改小（例如 < 10个节点），这样就能在无 License 模式下跑通算法流程，验证你的“高性能网络”理解。
+        由于你可能没有 Gurobi 的付费 License，先运行这个最稳妥。它会模拟 Petals 系统的策略。
+        
+        Bash
+        
+        ```
+        python step2_model_placement.py petals
+        ```
+        
+        _成功后，你会得到一个基于 Petals 策略的模型切分方案。_
+        
+    - 尝试 MILP 方法 (可选)：
+        
+        README 提到运行 ILP 之前必须先运行 petals，因为它是基于 petals 的结果进行初始化的。
+        
+        Bash
+        
+        ```
+        # 这一步可能会很慢，或者因为 License 限制报错
+        # 如果卡住太久（超过10分钟），可以按 Ctrl+C 中断，它会保存当前最好的结果
+        python step2_model_placement.py ilp
+        ```
+        
+4. 步骤 3：运行模拟 (Run Simulation)
+    
+    最后，利用生成的集群配置和模型放置方案跑数据流。
+    
+    - 情况 A：如果你只跑通了 Petals
+        
+        我们需要修改一下命令，使用 petals 的布局来跑模拟（因为 README 示例默认是用 ilp 的）。你需要查看 step3_run_simulation.py 的代码，看看如何指定使用 petals 的布局，或者尝试直接运行：
+        
+        Bash
+        
+        ```
+        # 如果脚本默认读 ilp 布局，可能会报错。
+        # 建议先试着运行 README 的原命令，看看它是否能自动回退或报错：
+        python step3_run_simulation.py offline maxflow
+        ```
+        
+    - 情况 B：如果你成功跑通了 ILP
+        
+        直接运行 README 的命令：
+        
+        Bash
+        
+        ```
+        python step3_run_simulation.py offline maxflow
+        ```
         
 
-### 下一步建议
+---
 
-当你成功跑通第一条命令，看到终端输出类似 "Throughput: xxx tokens/s" 的结果时，复现就算初步成功了！
+### 第三阶段：观察结果 (Expected Output)
 
-**等你环境搭好，如果你在阅读 `simulator` 源码时，对于它是如何用 `networkx` 构建那个“最大流图”的代码看不懂，请随时把那段代码贴给我，我帮你逐行解析。**
+根据 README，如果运行成功，你会在终端看到以下信息：
+
+1. **集群吞吐量上限**：
+    
+    Plaintext
+    
+    ```
+    Max compute throughput = 2803.86...
+    Max flow = 1289.55...
+    ```
+    
+2. 实时状态监控 (Watch)：
+    
+    会不断刷新每个节点的 KV-Cache 使用率：
+    
+    Plaintext
+    
+    ```
+    [Item] active queries: 61...
+    Node Name: Real Used / Real Total ...
+    ```
+    
+3. 最终统计 (Simulation Results)：
+    
+    模拟结束后（或 Ctrl+C 停止后）：
+    
+    Plaintext
+    
+    ```
+    Avg decode speed: 248.3 tokens/s
+    Avg prompt latency: 3.094s
+    ```
+    
+
+### 避坑指南
+
+1. **Gurobi License**：README 明确说 "Gurobi optimizes much slower with its default limited license"。在 AutoDL 上你使用的是免费版，如果 `step2_model_placement.py ilp` 跑得极慢，请直接放弃 ILP，专注于复现 `petals` 或 `swarm` 策略，这不影响你理解模拟器的流程。
+    
+2. **可视化报错**：README 提到 `simulator.visualize_cluster()` 会画图。在 AutoDL (SSH/终端) 环境下，如果没有图形界面支持，这一步可能会报错 `UserWarning: Matplotlib is currently using agg...` 或者不出图。这是正常的，不影响数据结果。
+    
+
+**现在，请按照“第一阶段”的步骤开始操作。如果 `pip install -e .` 成功了，请告诉我，我们继续！**
