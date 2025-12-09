@@ -6,6 +6,8 @@
  export PYTHONPATH=$PYTHONPATH:/root/autodl-tmp/workspace/Helix-ASPLOS25
 python step3_run_simulation.py offline swarm
 
+现在是481主机（有GPU）可以跑
+
 **小规模原型验证**：
 - 如果你手头有 2-3 张不同型号的 GPU（比如一张强卡，一张弱卡），可以尝试搭建一个最小化的 Helix 集群。
 - 利用 Dummy Weights 功能，不用担心显存存不下完整的 70B 模型（模型会被切分）。

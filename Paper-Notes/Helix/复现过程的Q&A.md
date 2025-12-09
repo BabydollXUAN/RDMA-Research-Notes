@@ -2,7 +2,21 @@ Q：唯一需要关注的硬件指标：内存 (RAM)
 A： **内存建议**：为了模拟大型集群（例如论文中的 42 节点设置），建议至少配备 **32 GB 内存**，以防止内存溢出（OOM）。 **小规模测试**：如果你只是想跑通代码，或者模拟较小规模的集群（例如 3-5 个节点），普通的 **16 GB 甚至 8 GB 内存** 的电脑通常也是足够的。
 
 Q：防止断连，虽然无卡模式不容易断，但如果你跑的实验需要很久
-A:建议在终端输入 `screen -S helix` 开启一个会话窗口来跑，这样即使网页关了程序还在运行。
+A: 建议在终端输入 `screen -S helix` 开启一个会话窗口来跑，这样即使网页关了程序还在运行。
+
+Q: 上传Github
+A：cd /root/autodl-tmp/workspace/Helix-ASPLOS25
+git status
+git add . 
+git commit -m "Restore full-scale simulation parameters (offline:240, online:1800s)"
+git push origin master
+
+Q： 怎么看Linux系统的运行内存（RAM）
+A： 在终端输入free -h
+- **`total` 列**：**这是你最关心的数字**。它表示这台机器的总内存大小。
+    - 如果是 **30Gi - 32Gi**：这是标准配置，跑 `offline` 大规模可能会崩（和你之前那台一样）。
+    - 如果是 **60Gi, 64Gi 或 120Gi+**：恭喜！这台机器足够跑 Helix 的 `offline` 模拟了。
+- **`available` 列**：表示当前还剩多少内存可用。
 
 Q: 观察结果 终端的输出含义
 A: ![[Pasted image 20251205223250.png]]
