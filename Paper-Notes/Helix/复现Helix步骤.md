@@ -2,6 +2,10 @@
 - 这能让你直接接触到论文的核心——**Max-Flow 建模和 MILP 求解**。你可以在单机上调整网络带宽参数（模拟高/低带宽），观察 Helix 的调度策略如何变化。
 - 关注 `networkx` 和 `gurobipy` 的交互部分。
 
+ 进入你的项目目录 cd /root/autodl-tmp/workspace/Helix-ASPLOS25/examples/simulation 尝试激活环境 conda activate helix
+ export PYTHONPATH=$PYTHONPATH:/root/autodl-tmp/workspace/Helix-ASPLOS25
+python step3_run_simulation.py offline swarm
+
 **小规模原型验证**：
 - 如果你手头有 2-3 张不同型号的 GPU（比如一张强卡，一张弱卡），可以尝试搭建一个最小化的 Helix 集群。
 - 利用 Dummy Weights 功能，不用担心显存存不下完整的 70B 模型（模型会被切分）。
@@ -176,4 +180,3 @@
 2. **可视化报错**：README 提到 `simulator.visualize_cluster()` 会画图。在 AutoDL (SSH/终端) 环境下，如果没有图形界面支持，这一步可能会报错 `UserWarning: Matplotlib is currently using agg...` 或者不出图。这是正常的，不影响数据结果。
     
 
-**现在，请按照“第一阶段”的步骤开始操作。如果 `pip install -e .` 成功了，请告诉我，我们继续！**
