@@ -2,11 +2,23 @@
 - 这能让你直接接触到论文的核心——**Max-Flow 建模和 MILP 求解**。你可以在单机上调整网络带宽参数（模拟高/低带宽），观察 Helix 的调度策略如何变化。
 - 关注 `networkx` 和 `gurobipy` 的交互部分。
 
+**跑baseline swarm算法**
  进入你的项目目录 cd /root/autodl-tmp/workspace/Helix-ASPLOS25/examples/simulation 尝试激活环境 conda activate helix
  export PYTHONPATH=$PYTHONPATH:/root/autodl-tmp/workspace/Helix-ASPLOS25
 python step3_run_simulation.py offline swarm
 
 现在是481主机（有GPU）可以跑
+
+保险起见，清理一下输出目录
+rm -rf layouts/ilp/*
+启动 ILP 求解
+python step2_model_placement.py ilp 建议等待 **5 到 10 分钟**。
+按下 **`Ctrl + C`** 组合键 把当前算出来的最好布局保存到文件中，并优雅退出
+ls layouts/ilp
+激活 Helix 布局 
+cp layouts/ilp/simulator_cluster.ini .
+运行 MaxFlow 模拟 (终极之战)
+python step3_run_simulation.py offline maxflow
 
 **小规模原型验证**：
 - 如果你手头有 2-3 张不同型号的 GPU（比如一张强卡，一张弱卡），可以尝试搭建一个最小化的 Helix 集群。
