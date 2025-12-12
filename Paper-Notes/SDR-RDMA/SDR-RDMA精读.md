@@ -66,19 +66,19 @@ SDR-RDMA的核心在于通过引入“部分完成位图（Bitmap）”来解耦
 
 1. **连接建立与资源分配 (Setup):**
     
-    - 发送方和接收方建立QP（Queue Pair）。接收方分配接收缓冲区，并根据消息大小和块（Chunk）大小配置位图 15151515。
+    - 发送方和接收方建立QP（Queue Pair）。接收方分配接收缓冲区，并根据消息大小和块（Chunk）大小配置位图 。
         
 2. **发送端数据切分与注入 (Sender):**
     
-    - 发送方使用**SDR SDK**发起发送请求（可以是流式发送或单次发送） 16。
+    - 发送方使用**SDR SDK**发起发送请求（可以是流式发送或单次发送） 。
         
-    - SDR后端将消息切分为多个数据包。关键在于，为了绕过硬件的可靠性检查，SDR使用**带有立即数（Immediate Data）的不可靠写（Unreliable Write）**操作 17。
+    - SDR后端将消息切分为多个数据包。关键在于，为了绕过硬件的可靠性检查，SDR使用**带有立即数（Immediate Data）的不可靠写（Unreliable Write）**操作 。
         
-    - 每个数据包作为一个独立的RDMA Write操作发送，立即数中编码了**消息ID**和**包偏移量（Offset）** 18。
+    - 每个数据包作为一个独立的RDMA Write操作发送，立即数中编码了**消息ID**和**包偏移量（Offset）** 。
         
 3. **接收端后端卸载处理 (Backend Offloading - DPA):**
     
-    - 数据包到达接收端网卡。为了不消耗主机CPU，处理逻辑被卸载到**DPA（Data Path Accelerator）**上 19。
+    - 数据包到达接收端网卡。为了不消耗主机CPU，处理逻辑被卸载到**DPA（Data Path Accelerator）**上 。
         
     - DPA线程并行轮询完成队列（CQ）。
         
