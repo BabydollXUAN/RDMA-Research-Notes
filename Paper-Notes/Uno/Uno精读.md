@@ -112,7 +112,7 @@ Uno的设计分为两个紧密耦合的组件：**UnoCC**（拥塞控制）和**
         
     - $K$：用户设定的常数，控制反应强度。
         
-    - _意义：_ 动态调整降速幅度。为了避免Phantom Queue导致的过度降速，如果检测到物理队列为空（Delay=0）但Phantom Queue拥塞，会乘以一个缩小因子 $0.3$ 进行**温和降速** 29。
+    - _意义：_ 动态调整降速幅度。为了避免Phantom Queue导致的过度降速，如果检测到物理队列为空（Delay=0）但Phantom Queue拥塞，会乘以一个缩小因子 $0.3$ 进行**温和降速** 。
         
 2. Quick Adapt (QA) 触发条件：
     
@@ -197,12 +197,12 @@ Uno的设计分为两个紧密耦合的组件：**UnoCC**（拥塞控制）和**
     
 - **关键实现点：**
     
-    - **Phantom Queue：** 在交换机出口端口维护两个计数器：`physical_bytes` 和 `phantom_bytes`。`phantom_bytes` 在入队时增加包大小，在出队时按 `0.9 * link_rate * time_delta` 减少 44。
+    - **Phantom Queue：** 在交换机出口端口维护两个计数器：`physical_bytes` 和 `phantom_bytes`。`phantom_bytes` 在入队时增加包大小，在出队时按 `0.9 * link_rate * time_delta` 减少 。
         
-    - **UnoCC状态机：** 需要实现Algorithm 1，特别是区分 `ONACK` (加法增) 和 `ONEPOCH` (乘性减) 的逻辑 45。
+    - **UnoCC状态机：** 需要实现Algorithm 1，特别是区分 `ONACK` (加法增) 和 `ONEPOCH` (乘性减) 的逻辑 。
         
 
-b) 超参数细节 46
+b) 超参数细节 
 
 - **$\alpha$ (AI Factor):** 设置为 $0.001 \times BDP$。
     
@@ -210,7 +210,7 @@ b) 超参数细节 46
     
 - **Epoch Period:** 基于 **Intra-DC RTT** (如14µs) 设置，而不是Inter-DC RTT。这是保证公平性的关键。
     
-- **Erasure Coding:** 推荐 (8, 2) 配置，即8个数据包+2个校验包 47。
+- **Erasure Coding:** 推荐 (8, 2) 配置，即8个数据包+2个校验包 。
     
 
 #### c) 迁移性
