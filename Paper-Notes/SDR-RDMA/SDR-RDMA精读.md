@@ -12,7 +12,6 @@
 
 - 传输语义太“粗糙”：传统RDMA提供的不可靠连接（UC）有个致命问题，只要一个包丢了，整个消息就作废，必须重新传所有数据。比如1GiB的消息丢了一个4KiB的包，就得重传1GiB，带宽和时间全浪费了。不可靠数据报（UD）虽支持单包独立传输，但乱序包需在CPU/NIC内存中缓存，失去零拷贝优势。
 
-你好！作为一名正在深入研究广域RDMA（Wide-Area RDMA）和高性能网络的研究生，这篇论文《SDR-RDMA: Software-Defined Reliability Architecture for Planetary Scale RDMA Communication》非常有价值。它解决的核心问题是如何在保持RDMA高性能的同时，处理长距离（Long-haul）传输中不可避免的高延迟和丢包问题。
 
 ### 0. 翻译摘要原文
 
