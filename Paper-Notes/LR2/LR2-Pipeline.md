@@ -27,7 +27,7 @@ LR2 的核心思想是 **"分工解耦"**：将复杂的选择性重传（SR）�
     
     - 假设长途链路发生丢包（例如 Seq 10丢失，Seq 11-20到达）。
         
-    - Depot 检测到 $PSN > ePSN$，进入 **"Reordering Mode"**。它不再转发乱序包给接收端（防止接收端 RNIC 触发 GBN NACK），而是将 Seq 11-20 暂时缓存到 **Reordering Pool** 。
+    - Depot 检测到 $PSN > ePSN$，进入 **"Reordering Mode"**。它不再转发乱序包给接收端（防止接收端 RNIC 触发 GBN NACK），==而是将 Seq 11-20 暂时缓存到 **Reordering Pool** 。==
         
 - **Step 2.2: 生成网内 NACK (Depot-NACK)**
     
@@ -113,4 +113,4 @@ sequenceDiagram
 
 ### 总结
 
-对于我们搞 AI Infra 的人来说，LR2 的本质是 **用 Switch 的计算能力和 Buffer 换取了 WAN 的带宽效率**。它不需要端侧 RNIC 具备昂贵的 SR 逻辑（这对大规模部署商用网卡非常友好），却能达到 SR 的效果，极大地减少了长尾延迟（Tail Latency），这对大模型训练中的梯度同步稳定性至关重要。
+LR2 的本质是 **用 Switch 的计算能力和 Buffer 换取了 WAN 的带宽效率**。它不需要端侧 RNIC 具备昂贵的 SR 逻辑（这对大规模部署商用网卡非常友好），却能达到 SR 的效果，极大地减少了长尾延迟（Tail Latency），这对大模型训练中的梯度同步稳定性至关重要。

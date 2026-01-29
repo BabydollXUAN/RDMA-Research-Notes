@@ -1,3 +1,4 @@
+**GitHub 代码库**：https://github.com/spcl/Uno_SC25.git
 ## **Phantom Queues（幻影队列）** 的详细代码逻辑解析。
 
 在 Uno 的设计中，幻影队列是部署在**交换机（Switch）**侧的机制。它的核心目的是在物理队列（Physical Queue）被填满之前提前感知拥塞，并为长 RTT 的跨数据中心（Inter-DC）流量提供足够大的虚拟缓冲空间来容纳 BDP（带宽时延积）。
