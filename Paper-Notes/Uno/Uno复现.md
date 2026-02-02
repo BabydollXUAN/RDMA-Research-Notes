@@ -1,4 +1,137 @@
 **GitHub 代码库**：https://github.com/spcl/Uno_SC25.git
+
+这是一个非常好的学习态度！作为研一学生，**读代码**和**改参数跑实验**是理解一篇顶会论文（SC/SIGCOMM/NSDI）最核心的两个抓手。
+
+Uno 这个项目的代码结构比较经典（基于 htsim 仿真器），我为你整理了一条**“由浅入深”**的学习路径，帮助你结合自己的广域 RDMA 方向做一些补充实验。
+
+---
+
+### 第一阶段：代码阅读（有的放矢，不要通读）
+
+不要试图从头读到尾，建议使用 **VS Code** 的“跳转到定义”（Ctrl + Click / F12）功能，按以下逻辑追踪：
+
+#### 1. 找到“入口”：`sim/datacenter/main_*.cpp`
+
+你刚才跑的脚本里调用的是 `htsim_lcp_entry_modern` 或 `htsim_uec_entry_modern`。
+
+- **去哪看**：打开 `sim/datacenter/main_lcp_entry_modern.cpp` (或类似命名的 main 文件)。
+    
+- **看什么**：这里是解析命令行参数（比如 `-interdcDelay`）的地方。你可以看到它是如何建立网络拓扑、初始化 Loggers（记录数据的组件）的。
+    
+
+#### 2. 找到“核心算法”：`sim/datacenter/uec.cpp` (或 `lcp.cpp`)
+
+这是 Uno/UEC 协议的**灵魂**所在。拥塞控制算法的所有逻辑都在这里。
+
+- **重点关注函数**：
+    
+    - `receivePacket()`: 当发送端收到 ACK 或 NACK 时会发生什么？
+        
+    - `adjust_window()`: **这是最关键的**。看它如何根据显式拥塞通知（ECN）或丢包来增加或减少拥塞窗口（Cwnd）。
+        
+    - `process_ack()`: 处理回包逻辑。
+        
+
+#### 3. 找到“数据包定义”：`sim/datacenter/uecpacket.h`
+
+- **看什么**：看 Packet Header 里加了哪些字段？比如 Uno 可能会在包头里携带“路径负载信息”或“精确的时间戳”，这对理解它是如何感知拥塞的很有帮助。
+    
+
+---
+
+### 第二阶段：设计补充实验（控制变量法）
+
+既然你的方向是 **“广域 RDMA (WAN-RDMA)”**，建议你从 `sc25_quick_validation.sh` 脚本入手，复制一份出来魔改。
+
+**准备工作：**
+
+Bash
+
+```
+cp sc25_quick_validation.sh my_wan_experiment.sh
+chmod +x my_wan_experiment.sh
+```
+
+用 VS Code 打开 `my_wan_experiment.sh`，找到那一长串运行命令。
+
+#### 实验 A：探究“长延迟”对吞吐量的影响 (Latency Sensitivity)
+
+广域网最大的特点是 RTT (往返时延) 大。
+
+- **修改参数**：找到 `-interdcDelay 886500` (单位通常是皮秒或纳秒，这里约 886us)。
+    
+- **怎么做**：
+    
+    - 设置三个梯度：`100000` (短距), `1000000` (中距), `10000000` (跨国长距)。
+        
+    - 分别运行，记录结果。
+        
+- **预期观察**：普通算法（如 RoCE DCQCN）在长延迟下吞吐量会剧烈抖动，而 Uno 应该能保持稳定。这是你论文里很好的 Motivation 图。
+    
+
+#### 实验 B：探究“带宽利用率”与“丢包”的关系
+
+- **修改参数**：修改 `-queueSizeRatio` 或 `-forceQueueSize`。
+    
+- **怎么做**：把交换机队列设得非常小（模拟浅缓存交换机），看看 Uno 会不会因为 Buffer 溢出而导致丢包重传，进而性能崩塌。
+    
+
+---
+
+### 第三阶段：代码“埋点”观察（Printf Debugging）
+
+这是理解算法动态过程最直观的方法。
+
+1. **修改代码**：
+    
+    打开 `sim/datacenter/uec.cpp`，在 `adjust_window` 函数里加一行打印：
+    
+    C++
+    
+    ```
+    // 伪代码示例
+    if (cwnd_changed) {
+       printf("Time: %lu, Node: %d, OldCwnd: %d, NewCwnd: %d, Reason: %s\n", 
+              eventlist().now(), _id, old_cwnd, _cwnd, "ECN_Congestion");
+    }
+    ```
+    
+2. **重新编译**：
+    
+    Bash
+    
+    ```
+    cd ~/Uno_Project/sim/datacenter
+    make -j4
+    ```
+    
+3. **运行脚本并重定向**：
+    
+    Bash
+    
+    ```
+    ./htsim_uec_entry ... > my_debug_log.txt
+    ```
+    
+4. **分析日志**：
+    
+    你可以看到 Cwnd 随时间变化的精确数值，这比看最后的统计图更能让你理解算法的“微操”。
+    
+
+---
+
+### 💡 一个针对你毕业论文的建议
+
+既然你是研一，现在做**“复现+微调”**是性价比最高的。
+
+**下一步行动建议：**
+
+1. **画一张图**：尝试把你刚才生成的 `artifact_results/fig3/uno_rate.dat` 数据，自己用 Python (`matplotlib`) 画一遍。不要用脚本画，自己写代码读数据画图，这样你以后就能随心所欲地展示数据了。
+    
+2. **改一个参数**：现在就去把 `-interdcDelay` 增大 10 倍，看看 Uno 还能不能跑满带宽？
+    
+
+需要我给你提供一个简单的 **Python 画图脚本模板**，用来读取 `.dat` 文件并画出吞吐量曲线吗？
 ## **Phantom Queues（幻影队列）** 的详细代码逻辑解析。
 
 在 Uno 的设计中，幻影队列是部署在**交换机（Switch）**侧的机制。它的核心目的是在物理队列（Physical Queue）被填满之前提前感知拥塞，并为长 RTT 的跨数据中心（Inter-DC）流量提供足够大的虚拟缓冲空间来容纳 BDP（带宽时延积）。
