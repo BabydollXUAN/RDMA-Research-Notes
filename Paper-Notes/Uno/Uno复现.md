@@ -1,5 +1,33 @@
 **GitHub 代码库**：https://github.com/spcl/Uno_SC25.git
 
+
+## Simulator: `sim/`
+
+`sim` is a modified version of the **htsim** datacenter simulator. The  
+binary `sim/datacenter/htsim_lcp_entry_modern` is invoked by the Python  
+and shell scripts; it reads command‑line options, loads a topology and  
+traffic matrix, then instantiates sources and sinks that send flows  
+between hosts.
+`sim` 是对 **htsim** 数据中心模拟器的修改版本。这二进制文件`sim/datacenter/htsim_lcp_entry_modern` 由 Python 和 shell 脚本调用；它读取命令行选项，加载拓扑结构和流量矩阵，然后实例化源和宿节点，使主机之间发送流。
+
+看看里面是 waf 还是 ns3 脚本 ls -F
+## Q&A：
+### 1. (base) ustc@xuningunon1-3317:/$ nvidia-smi
+NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver. Make sure that the latest NVIDIA driver is installed and running.出现了这个问题，是没有GPU驱动吗
+
+是的，出现这个报错通常意味着**系统虽然识别到了 GPU 硬件，但没有正确加载或安装与之匹配的 NVIDIA 驱动程序**。
+
+在 CENI 的虚拟机环境下，这种情况通常有三种可能：
+
+1. **完全没装驱动**：这是一个纯净镜像，需要你手动安装。
+    
+2. **驱动挂了**：之前装过，但因为内核更新（Kernel Update）导致驱动失效。
+    
+3. **驱动与内核不兼容**：安装的版本不对。
+
+### 2.
+
+
 这是一个非常好的学习态度！作为研一学生，**读代码**和**改参数跑实验**是理解一篇顶会论文（SC/SIGCOMM/NSDI）最核心的两个抓手。
 
 Uno 这个项目的代码结构比较经典（基于 htsim 仿真器），我为你整理了一条**“由浅入深”**的学习路径，帮助你结合自己的广域 RDMA 方向做一些补充实验。
