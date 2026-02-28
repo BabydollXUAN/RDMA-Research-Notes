@@ -79,7 +79,11 @@ sudo sh -c 'echo "/dev/vda4 /home/ustc/autodl-tmp ext4 defaults 0 0" >> /etc/fst
 高性能网络协议通常需要 **C++17** 支持。
 
 - **检查版本**：`gcc --version`。
-    
+
+从Ubuntu18升级到20
+do-release-upgrade
+正常服务器不需要频繁重启的
+掉了重新打一下驱动 昨天教你的
 - **安装基础套件**：`sudo apt update && sudo apt install -y build-essential cmake`。
     
 
@@ -145,8 +149,21 @@ git clone https://mirror.ghproxy.com/https://github.com/用户名/仓库名.git
 平台以“**试验**”为核心单元，通过承载虚拟机和链路资源，辅助用户完成技术验证。资源随试验的创建而开启，随试验的结束而回收。试验中的“**节点**”即虚拟服务器，涵盖了从通用 CPU 到高性能 GPU 的全套配置，用户可根据业务需求灵活调整参数，以获取匹配的计算与存储能力。
 最近连ceni服务器，遇到了一些困难，随手写下Q&A文档供大家参考。
 ![[Pasted image 20260211182051.png]]
+可以选ubuntu18-desktop
 不用172.16.0.0 连不上外网 必须设置成172.16.0.0
 那个20.04疑似是被别人改过环境的 专门用来做bmv2实验的
 
 每次重启后，都要在网页版重新登陆，cd frp_0.42.0_linux_amd64 
 ./frpc -c ./frpc.ini
+
+这个教程的前提是centos系统，你从第2步开始
+
+安装ssh服务端：
+sudo apt-get update  
+sudo apt install openssh-server -y
+
+nohup ./frpc -c ./frpc.ini > frp_log.txt 2>&1 &
+
+sudo apt-get update
+sudo apt-get install dkms
+sudo dkms install -m nvidia -v 535.98
