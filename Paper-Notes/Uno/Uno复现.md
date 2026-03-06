@@ -1,349 +1,86 @@
 **GitHub 代码库**：https://github.com/spcl/Uno_SC25.git
 
-
-## Simulator: `sim/`
-
-`sim` is a modified version of the **htsim** datacenter simulator. The  
-binary `sim/datacenter/htsim_lcp_entry_modern` is invoked by the Python  
-and shell scripts; it reads command‑line options, loads a topology and  
-traffic matrix, then instantiates sources and sinks that send flows  
-between hosts.
-`sim` 是对 **htsim** 数据中心模拟器的修改版本。这二进制文件`sim/datacenter/htsim_lcp_entry_modern` 由 Python 和 shell 脚本调用；它读取命令行选项，加载拓扑结构和流量矩阵，然后实例化源和宿节点，使主机之间发送流。
-
-看看里面是 waf 还是 ns3 脚本 ls -F
-## Q&A：
-### 1. (base) ustc@xuningunon1-3317:/$ nvidia-smi
-NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver. Make sure that the latest NVIDIA driver is installed and running.出现了这个问题，是没有GPU驱动吗
-
-是的，出现这个报错通常意味着**系统虽然识别到了 GPU 硬件，但没有正确加载或安装与之匹配的 NVIDIA 驱动程序**。
-
-在 CENI 的虚拟机环境下，这种情况通常有三种可能：
-
-1. **完全没装驱动**：这是一个纯净镜像，需要你手动安装。
-    
-2. **驱动挂了**：之前装过，但因为内核更新（Kernel Update）导致驱动失效。
-    
-3. **驱动与内核不兼容**：安装的版本不对。
-
-### 2.
-
-
-这是一个非常好的学习态度！作为研一学生，**读代码**和**改参数跑实验**是理解一篇顶会论文（SC/SIGCOMM/NSDI）最核心的两个抓手。
-
-Uno 这个项目的代码结构比较经典（基于 htsim 仿真器），我为你整理了一条**“由浅入深”**的学习路径，帮助你结合自己的广域 RDMA 方向做一些补充实验。
-
----
-
-### 第一阶段：代码阅读（有的放矢，不要通读）
-
-不要试图从头读到尾，建议使用 **VS Code** 的“跳转到定义”（Ctrl + Click / F12）功能，按以下逻辑追踪：
-
-#### 1. 找到“入口”：`sim/datacenter/main_*.cpp`
-
-你刚才跑的脚本里调用的是 `htsim_lcp_entry_modern` 或 `htsim_uec_entry_modern`。
-
-- **去哪看**：打开 `sim/datacenter/main_lcp_entry_modern.cpp` (或类似命名的 main 文件)。
-    
-- **看什么**：这里是解析命令行参数（比如 `-interdcDelay`）的地方。你可以看到它是如何建立网络拓扑、初始化 Loggers（记录数据的组件）的。
-    
-
-#### 2. 找到“核心算法”：`sim/datacenter/uec.cpp` (或 `lcp.cpp`)
-
-这是 Uno/UEC 协议的**灵魂**所在。拥塞控制算法的所有逻辑都在这里。
-
-- **重点关注函数**：
-    
-    - `receivePacket()`: 当发送端收到 ACK 或 NACK 时会发生什么？
-        
-    - `adjust_window()`: **这是最关键的**。看它如何根据显式拥塞通知（ECN）或丢包来增加或减少拥塞窗口（Cwnd）。
-        
-    - `process_ack()`: 处理回包逻辑。
-        
-
-#### 3. 找到“数据包定义”：`sim/datacenter/uecpacket.h`
-
-- **看什么**：看 Packet Header 里加了哪些字段？比如 Uno 可能会在包头里携带“路径负载信息”或“精确的时间戳”，这对理解它是如何感知拥塞的很有帮助。
-    
-
----
-
-### 第二阶段：设计补充实验（控制变量法）
-
-既然你的方向是 **“广域 RDMA (WAN-RDMA)”**，建议你从 `sc25_quick_validation.sh` 脚本入手，复制一份出来魔改。
-
-**准备工作：**
-
-Bash
-
-```
-cp sc25_quick_validation.sh my_wan_experiment.sh
-chmod +x my_wan_experiment.sh
+改完后一定要**重新编译 C++ 模拟器**，然后在终端输入：
+```cpp
+cd /home/ustc/Uno_SC25/sim
+make
 ```
 
-用 VS Code 打开 `my_wan_experiment.sh`，找到那一长串运行命令。
-
-#### 实验 A：探究“长延迟”对吞吐量的影响 (Latency Sensitivity)
-
-广域网最大的特点是 RTT (往返时延) 大。
-
-- **修改参数**：找到 `-interdcDelay 886500` (单位通常是皮秒或纳秒，这里约 886us)。
-    
-- **怎么做**：
-    
-    - 设置三个梯度：`100000` (短距), `1000000` (中距), `10000000` (跨国长距)。
-        
-    - 分别运行，记录结果。
-        
-- **预期观察**：普通算法（如 RoCE DCQCN）在长延迟下吞吐量会剧烈抖动，而 Uno 应该能保持稳定。这是你论文里很好的 Motivation 图。
-    
-
-#### 实验 B：探究“带宽利用率”与“丢包”的关系
-
-- **修改参数**：修改 `-queueSizeRatio` 或 `-forceQueueSize`。
-    
-- **怎么做**：把交换机队列设得非常小（模拟浅缓存交换机），看看 Uno 会不会因为 Buffer 溢出而导致丢包重传，进而性能崩塌。
-    
-
----
-
-### 第三阶段：代码“埋点”观察（Printf Debugging）
-
-这是理解算法动态过程最直观的方法。
-
-1. **修改代码**：
-    
-    打开 `sim/datacenter/uec.cpp`，在 `adjust_window` 函数里加一行打印：
-    
-    C++
-    
-    ```
-    // 伪代码示例
-    if (cwnd_changed) {
-       printf("Time: %lu, Node: %d, OldCwnd: %d, NewCwnd: %d, Reason: %s\n", 
-              eventlist().now(), _id, old_cwnd, _cwnd, "ECN_Congestion");
-    }
-    ```
-    
-2. **重新编译**：
-    
-    Bash
-    
-    ```
-    cd ~/Uno_Project/sim/datacenter
-    make -j4
-    ```
-    
-3. **运行脚本并重定向**：
-    
-    Bash
-    
-    ```
-    ./htsim_uec_entry ... > my_debug_log.txt
-    ```
-    
-4. **分析日志**：
-    
-    你可以看到 Cwnd 随时间变化的精确数值，这比看最后的统计图更能让你理解算法的“微操”。
-    
-
----
-
-### 💡 一个针对你毕业论文的建议
-
-既然你是研一，现在做**“复现+微调”**是性价比最高的。
-
-**下一步行动建议：**
-
-1. **画一张图**：尝试把你刚才生成的 `artifact_results/fig3/uno_rate.dat` 数据，自己用 Python (`matplotlib`) 画一遍。不要用脚本画，自己写代码读数据画图，这样你以后就能随心所欲地展示数据了。
-    
-2. **改一个参数**：现在就去把 `-interdcDelay` 增大 10 倍，看看 Uno 还能不能跑满带宽？
-    
-
-需要我给你提供一个简单的 **Python 画图脚本模板**，用来读取 `.dat` 文件并画出吞吐量曲线吗？
-## **Phantom Queues（幻影队列）** 的详细代码逻辑解析。
-
-在 Uno 的设计中，幻影队列是部署在**交换机（Switch）**侧的机制。它的核心目的是在物理队列（Physical Queue）被填满之前提前感知拥塞，并为长 RTT 的跨数据中心（Inter-DC）流量提供足够大的虚拟缓冲空间来容纳 BDP（带宽时延积）。
-
-
----
-
-### 1. 核心数据结构 (Data Structures)
-
-在 `htsim` 的队列类（例如 `Queue` 或 `CompositeQueue`）中，除了维护现有的物理包列表外，你需要增加一组用于维护幻影队列状态的变量。
-
-C++
-
+方案一：**跨机房流保护（引入非线性惩罚）**
+修改定位：sim/uec.cpp 里的 dec_fact = y_rtt / (double)_base_rtt;
+原版逻辑：当前的惩罚是线性的（除以 _base_rtt）。如果 Inter-DC（跨机房）的时延是 Intra-DC 的 10 倍，它被惩罚的力度也就是十分之一。
+怎么改：我们可以引入一个“偏心指数”，比如用平方或者加倍放大 _base_rtt 的地位。
+将这一行改为：
+```cpp
+// 给 base_rtt 加上 1.5 倍的权重，让长 RTT 的数据流降速更少（更霸道）
+double dec_fact = y_rtt / ((double)_base_rtt * 1.5); 
 ```
-class Queue {
-    // === 物理队列状态 (现有) ===
-    uint64_t _bytes_in_queue; // 物理队列当前的字节数
-    uint64_t _max_buffer_size; // 物理缓存上限 (e.g., 1MB)
+- **预期结果与缘由**：在混合流量场景下（尤其是图 13 验证的数据中心内外混合流），你会发现跨机房（Inter-DC）宽带抢占能力大幅度提升，吞吐量变大；但这可能会导致机房内（Intra-DC）短距离流的排队更严重。你可以通过画出来的图去观察这种“帕累托最优”的此消彼长！
 
-    // === 幻影队列状态 (新增) ===
-    double _phantom_bytes;      // 幻影队列当前的虚拟字节数 (使用 double 以便精确计算流出)
-    uint64_t _phantom_max_size; // 幻影队列的虚拟容量 (设置为 Inter-DC BDP, e.g., 500MB)
-    
-    // === 时间与速率 ===
-    simtime_picoseconds _last_update_time; // 上次更新幻影队列的时间戳
-    uint64_t _link_rate;        // 物理链路速率 (e.g., 100Gbps)
-    double _drain_rate_factor;  // 排水速率因子 (Uno 论文设定为 0.9) 
-};
-```
-
-### 2. 关键逻辑：更新与入队 (Update & Enqueue)
-
-幻影队列并不真正存储数据包，它只是一个**计数器**。这个计数器的增减逻辑是其灵魂所在。
-
-#### A. 排水逻辑 (Draining Logic)
-
-每当有操作（如包到达或包离开）发生时，首先要根据“当前时间”与“上次更新时间”的差值，计算幻影队列“流出”了多少数据。
-
-- **论文依据**：幻影队列以恒定速率减少，该速率略低于线速（Line Rate）。
-    
-- **参数设定**：Uno 将排水速率设定为物理带宽的 **90%** 。
-    
-
-C++
-
-```
-void Queue::update_phantom_state(simtime_picoseconds current_time) {
-    // 1. 计算时间差
-    simtime_picoseconds time_diff = current_time - _last_update_time;
-    
-    if (time_diff > 0) {
-        // 2. 计算这段时间内应该流出多少字节
-        // Drain Rate = Link Rate * 0.9
-        double drained_bits = time_diff * (_link_rate * 0.9); 
-        double drained_bytes = drained_bits / 8.0;
-
-        // 3. 更新幻影队列长度 (不能小于 0)
-        _phantom_bytes -= drained_bytes;
-        if (_phantom_bytes < 0) {
-            _phantom_bytes = 0;
-        }
-
-        // 4. 更新时间戳
-        _last_update_time = current_time;
-    }
+方案二：**提升降窗保底**（优化长尾延迟/Tail Latency）
+修改定位：sim/uec.cpp 底部计算最终大砍一刀的地方。
+原版逻辑：如果砍得太狠，保底只剩 1 个数据包 _cwnd = _mss;。
+怎么改：把保底值提升到 4（或者像 Google BBR 一样提升到 10）。
+把原来的 if...else 块改成：
+```cpp
+if (_cwnd > 4 * _mss + gent_dec_amount) {
+    _cwnd = _cwnd - gent_dec_amount; 
+} else {
+    // 绝对不让窗口小于 4 个 MSS，防止流彻底饿死
+    _cwnd = 4 * _mss; 
 }
 ```
 
-#### B. 入队与标记逻辑 (Enqueue & Marking)
+方案三：激进的“试探性”重传窗口
+修改定位：sim/uec.cpp 的 uint32_t val1 = temp_window / dec_fact;
 
-当一个真实的数据包到达交换机端口时，你需要执行以下步骤：
-
-1. **同步状态**：调用上面的 `update_phantom_state`。
-    
-2. **虚拟入队**：将包大小加到 `_phantom_bytes` 上 。
-    
-3. **ECN 判决**：使用幻影队列的长度（而非物理队列长度）来决定是否打 ECN 标记 。
-    
-
-C++
-
+原版逻辑：老老实实除以时间因子。
+怎么改：给计算出的惩罚加上一个“折扣”。
+```cpp
+// 打个 8 折，我就是要少砍一点，胆子大一点
+uint32_t val1 = (temp_window / dec_fact) * 0.8; 
 ```
-void Queue::receivePacket(Packet* pkt) {
-    simtime_picoseconds now = eventlist().now();
-    
-    // === 1. 更新幻影队列水位 ===
-    update_phantom_state(now);
+预期结果与缘由：官方的下掉逻辑偏保守。打 8 折可以让 Uno 在网络有随机抖动（如光模块微损引发的假丢包）时抵抗力更强。如果网络的实际 Buffer 够大，这么改可以压榨出更高的极限链路利用率！
 
-    // === 2. 虚拟入队 ===
-    // 无论物理队列是否满，幻影队列都要增加计数
-    _phantom_bytes += pkt->size();
+**Q&A**：
+1.两个图相同
+这个我们依赖来跑实验的 C++ 核心模拟器可执行文件 htsim_lcp_entry_modern 的最后修改时间，居然还是 3月3号晚上 21:16（也就是好几个小时前我们第一次帮你从一堆报错里修好编译时候生的旧版本）。
 
-    // === 3. ECN 标记逻辑 (基于幻影队列) ===
-    // 设定阈值: Min = 25% of BDP, Max = 75% of BDP [cite: 574]
-    double p_min = _phantom_max_size * 0.25; 
-    double p_max = _phantom_max_size * 0.75;
-    
-    bool mark_packet = false;
+这是为什么？
+因为刚才我们虽然改了 sim/uec.cpp 文件，并且我也帮你执行了 make clean && make -j 8；但是，那个 make 生成的是 sim 文件夹下的通用库 libhtsim.a，而 sc25_quick_validation.sh 脚本在调用的时候，是用**sim/datacenter里的上层 htsim_lcp_entry_modern的二进制。因为我没有在这个上层目录再次强制重新触发链接编译最新的主程序，导致它现在用来跑这100多趟实验的老牛，还是原来那头未动过手脚的老牛！**
 
-    if (_phantom_bytes > p_max) {
-        mark_packet = true; // 超过高水位，必标记
-    } else if (_phantom_bytes > p_min) {
-        // 在 Min 和 Max 之间，使用 RED (Random Early Detection) 计算概率
-        double probability = (_phantom_bytes - p_min) / (p_max - p_min);
-        if (random_double() < probability) {
-            mark_packet = true;
-        }
-    }
+所以它老老实实把一模一样的实验、利用原版未修改的计算公式又跑了一遍，画出来的图自然一模一样！
 
-    if (mark_packet) {
-        pkt->set_flags(pkt->flags() | ECN_CE); // CE = Congestion Experienced
-    }
+这一步骤需要强制重新编译+清空缓存：
+这个锅算我的，接下来我要在你的终端直接操作：
 
-    // === 4. 物理入队逻辑 (标准的 Tail-Drop) ===
-    if (_bytes_in_queue + pkt->size() > _max_buffer_size) {
-        drop(pkt); // 物理缓存满了，必须丢包
-    } else {
-        _bytes_in_queue += pkt->size();
-        send_to_link(pkt); // 发送包
-    }
-}
+彻彻底底地把所有关联 C++ 缓存删干净重新编译。
+把上一回跑出来污染的 .tmp 结果强行删掉，不然 Python 可能会偷懒复用。
+```cpp
+cd /home/ustc/Uno_SC25/simmake clean && make -j 8cd datacentermake clean && make -j 8
 ```
 
-### 3. 为什么排水速率是 90%？(The "Headroom" Logic)
+**实验输入**：
+网络与流量参数：包括网络带宽（如 400Gbps）、网络延迟（如跨数据中心的 1ms/5ms/10ms RTT 与数据中心内部的 5µs/10µs/20µs）、消息/流大小（消息传输字节数）、以及流量负载强度（40%, 60%, 80%等）。
+仿真配置文件：位于 sim/（底层仿真器 C++ 代码所在）、configs/ 或 traffic_gen/ 中给定的流量生成模式和路由机制参数。
+这些参数由诸如 sc25_fig10_realistic_60_load.sh 这样的 bash 启动脚本，或是各个 .py 脚本设定并喂给模拟器。
 
-你可能会疑惑为什么不设为 100%。
+**实验输出**：
+原始数据 (Logs)：网络模拟器运行完成后的日志，反映了每个数据流的完成时间 (Flow Completion Time, FCT)、队列长度、吞吐量分布等性能指标。
+可视化图表 (Plots)：画图脚本会解析这些原始结果或理论数据，并将生成的 PDF / PNG 格式图表保存在 artifact_results 目录下。
 
-- **原理**：如果幻影队列的排水速度（0.9）比物理队列（1.0）慢，那么当流量持续到来时，幻影队列会比物理队列**先满**（或者说水位更高）。
-    
-- **效果**：ECN 标记会基于较高的幻影水位提前触发。发送端收到 ECN 后会减速。
-    
-- **零排队 (Near-zero queuing)**：由于减速信号发出的非常早，物理队列可能实际上还是空的，或者只有很少的包。这为时延敏感的小流（Intra-DC RPCs）预留了物理带宽的 "Headroom"，从而实现极低的排队时延 。
-    
-
-### 4. 发送端配合 (UnoCC Sender Logic)
-
-幻影队列仅仅是生成信号，发送端（UnoCC）必须正确解读这个信号。这在论文的 Algorithm 1 中有描述。
-
-发送端需要区分**两种拥塞**：
-
-1. **真实拥塞 (Physical Congestion)**：物理队列真的堵了，延迟很高。
-    
-2. **幻影拥塞 (Phantom Congestion)**：物理队列是空的，但幻影队列计算出需要减速。
-    
-
-**代码实现逻辑 (Sender Side):**
-
-C++
-
+2.为什么“非线性惩罚”导致结果绝对一致？
+**网络模拟器是绝对确定性的 (Deterministic)**：  
+你使用的基于事件驱动的自研模拟器（类似 NS-3 等）完全依赖伪随机数生成器。在类似 [fig3_run_all.py](vscode-file://vscode-app/c:/Users/86188/AppData/Local/Programs/Microsoft%20VS%20Code/072586267e/resources/app/out/vs/code/electron-browser/workbench/workbench.html) 或 `fig8_comparison.py` 的脚本中，你可以看到启动命令写死了硬编码种子：
+```cpp
+# fig3_run_all.py 第 24 行片段
+"-seed", "215",  # uno参数
+# 或者下面的
+"-seed", "15",   # bbr/gemini参数
 ```
-// 当收到带有 ECN 标记的 ACK 时
-if (ack.ecn_marked) {
-    // 计算当前测得的排队延迟
-    // RTT_base 是该路径的最小物理 RTT
-    simtime_picoseconds queue_delay = measured_rtt - rtt_base;
+**在固定了网络拓扑、初始发包事件和随机数种子的情况下，无论你的数学惩罚公式多么复杂、非线性，只要输入是特定的 [x](vscode-file://vscode-app/c:/Users/86188/AppData/Local/Programs/Microsoft%20VS%20Code/072586267e/resources/app/out/vs/code/electron-browser/workbench/workbench.html)，算出的 [y](vscode-file://vscode-app/c:/Users/86188/AppData/Local/Programs/Microsoft%20VS%20Code/072586267e/resources/app/out/vs/code/electron-browser/workbench/workbench.html) 就肯定是一模一样的。** 系统会以皮秒不差的精度执行完全一模一样的路由、拥塞和排队逻辑，产生每一行字节都不差的日志文件，因此最后 Matplotlib 画出的图当然连一个像素都不会变。
 
-    double md_scale = 1.0;
-
-    // 判断是否仅仅是幻影拥塞
-    // 如果排队延迟接近 0 (或者非常小)，说明物理队列是空的
-    if (queue_delay <= TINY_THRESHOLD) {
-        // [cite: 386, 387]
-        // 此时是幻影队列在告警，但物理路况还行
-        // 采用 "Gentle Reduction" (温和减少)
-        md_scale = 0.3; 
-    } else {
-        // [cite: 391, 392]
-        // 物理队列也堵了，必须全速降低
-        md_scale = 1.0;
-    }
-
-    // 执行乘法减小 (MD)
-    // MD_ECN 是标准衰减因子
-    cwnd = cwnd * (1 - MD_ECN * md_scale);
-}
-```
-
-### 总结 (Summary for Implementation)
-
-要复现 Phantom Queue，你需要在 `htsim` 中做两处主要修改：
-
-1. **在 Switch/Queue 类中**：实现一个比物理出口速率慢 10% 的虚拟计数器，并基于这个计数器的值来打 ECN 标记。
-    
-2. **在 Sender/UnoCC 类中**：在处理 ECN 时检查 RTT。如果 RTT 很低但有 ECN，说明是幻影队列在起作用，此时应将窗口减少的力度（MD Factor）乘以 0.3。
-    
-
-这是 Uno 能够同时处理 Intra-DC（低延迟）和 Inter-DC（大吞吐）流量且互不干扰的关键所在。
+3.**为什么你修改的 C++ 代码（`sim/lcp.cpp`）在很多实验中没反应？**  
+    我查看了你的 Git 工作区，发现你在 `sim/lcp.cpp` 中将一行判定条件从：  
+    `if (rtt > _base_rtt * 1.055)` 修改成了 `if (rtt > _base_rtt * 1.2)`。  
+    如果你运行某个实验（比如 fig3 甚至 fig8 的某些设置），网络拓扑中的 `rtt` **压根没有落在 `[1.055, 1.2)` 这个区间内**（要么一直没超 1.055，要么平时拥塞直接飙破 1.2），这就意味着代码控制流在绝大多数图表的场景里跟 Baseline 走的路线是一模一样的，结果也就原封不动。
