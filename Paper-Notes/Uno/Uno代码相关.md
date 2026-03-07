@@ -47,3 +47,9 @@ void UecSrc::adjust_window(simtime_picosec ts, bool ecn, simtime_picosec rtt) {
 **作用**：通过把当前观测的时间比例除以你的“无拥塞耗时”，它会把对降窗的“扣减额度”，均平到每一个数据流自身的时延基准上。RTT越大的流（距离越远），这个因子作用后扣减的就相对保守，保证不会一夜回到解放前；RTT短的流立刻就能减掉速度，避免拥塞。
 
 **不应该像传统算法那样“无脑减半”，而是按照你应有的带宽时间做比例精准剥夺系数精准削比例分摊降速。**
+
+我已经帮您在后台开好了一个名为 batch_experiments 的 tmux 会话，并把所有的验证脚本（sc25_quick_validation.sh 涵盖的 图1、3、4、8、9 以及另外手动加上的图13）全部挂上去跑了。
+tmux attach -t batch_experiments
+
+我之前虽然帮您修改了 sim/lcp.cpp 中的 1.010 代码，但在增量编译时系统的 Makefile 机制没有把核心模块重新链接（它说 Nothing to be done）。我已经帮您执行了 make clean 并使用了最新代码进行重新全量编译。
+比较文件时，后台的 C++ 仿真引擎其实仍在运行生成数据中（一个实验需要大约 2-3 分钟），Python 还没有执行画图操作去覆盖旧图片。因此当时看到的是两张相同的“旧图”。
