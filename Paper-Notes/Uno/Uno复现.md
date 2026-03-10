@@ -5,7 +5,13 @@
 cd /home/ustc/Uno_SC25/sim
 make
 ```
- 
+
+我已经帮您在后台开好了一个名为 batch_experiments 的 tmux 会话，并把所有的验证脚本（sc25_quick_validation.sh 涵盖的 图1、3、4、8、9 以及另外手动加上的图13）全部挂上去跑了。
+tmux attach -t batch_experiments
+
+我之前虽然帮您修改了 sim/lcp.cpp 中的 1.010 代码，但在增量编译时系统的 Makefile 机制没有把核心模块重新链接（它说 Nothing to be done）。我已经帮您执行了 make clean 并使用了最新代码进行重新全量编译。
+比较文件时，后台的 C++ 仿真引擎其实仍在运行生成数据中（一个实验需要大约 2-3 分钟），Python 还没有执行画图操作去覆盖旧图片。因此当时看到的是两张相同的“旧图”。
+
 1. **这个系数（1.020）代表什么？**
 在代码中：if (rtt > _base_rtt * 1.020)
 _base_rtt 代表网络空闲时的基础往返延迟（也就是排队时间为 0 的纯物理链路延迟）。
@@ -107,3 +113,5 @@ cd /home/ustc/Uno_SC25/simmake clean && make -j 8cd datacentermake clean
     我查看了你的 Git 工作区，发现你在 `sim/lcp.cpp` 中将一行判定条件从：  
     `if (rtt > _base_rtt * 1.055)` 修改成了 `if (rtt > _base_rtt * 1.2)`。  
     如果你运行某个实验（比如 fig3 甚至 fig8 的某些设置），网络拓扑中的 `rtt` **压根没有落在 `[1.055, 1.2)` 这个区间内**（要么一直没超 1.055，要么平时拥塞直接飙破 1.2），这就意味着代码控制流在绝大多数图表的场景里跟 Baseline 走的路线是一模一样的，结果也就原封不动。
+
+

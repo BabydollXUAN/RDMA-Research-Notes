@@ -48,8 +48,4 @@ void UecSrc::adjust_window(simtime_picosec ts, bool ecn, simtime_picosec rtt) {
 
 **不应该像传统算法那样“无脑减半”，而是按照你应有的带宽时间做比例精准剥夺系数精准削比例分摊降速。**
 
-我已经帮您在后台开好了一个名为 batch_experiments 的 tmux 会话，并把所有的验证脚本（sc25_quick_validation.sh 涵盖的 图1、3、4、8、9 以及另外手动加上的图13）全部挂上去跑了。
-tmux attach -t batch_experiments
 
-我之前虽然帮您修改了 sim/lcp.cpp 中的 1.010 代码，但在增量编译时系统的 Makefile 机制没有把核心模块重新链接（它说 Nothing to be done）。我已经帮您执行了 make clean 并使用了最新代码进行重新全量编译。
-比较文件时，后台的 C++ 仿真引擎其实仍在运行生成数据中（一个实验需要大约 2-3 分钟），Python 还没有执行画图操作去覆盖旧图片。因此当时看到的是两张相同的“旧图”。

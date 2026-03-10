@@ -419,8 +419,6 @@
 
 ## 图 12: Uno 在不同队列容量下的性能对比
 
-<img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663384251806/dujdWPGtsJHtZfvU.webp" width="600"/>
-
 ### 基本要素
 
 - **图 12** 包含六个子图，展示了在 40% 网络负载下，当数据中心内部和跨数据中心队列容量不同时，Uno 与其他基线协议在三种流量类型（All Flows, Inter-DC Flows, Intra-DC Flows）的平均流完成时间（Avg FCT）和 99 百分位流完成时间（P99 FCT）上的性能对比。
@@ -451,8 +449,8 @@
 
 
 ## 图 13: Uno 在不同故障场景和工作负载下的性能
+<img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663384251806/dujdWPGtsJHtZfvU.webp" width="600"/>
 
-<img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663384251806/fpHFzWRZJYJwfXNU.webp" width="600"/>
 
 ### 基本要素
 
