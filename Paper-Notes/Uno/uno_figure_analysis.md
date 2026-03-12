@@ -82,7 +82,7 @@
 
 ### 基本要素
 
-- **图 3A**: 实验设置示意图，展示了两个数据中心（DC1, DC2）通过多条链路连接，其中 DC2 存在一个**热点（Hotspot）**，接收来自 DC1 的 Intra-DC 流和 Inter-DC 流。发送方（Sending to 15）和接收方（Receiver 15）表示有 15 个发送方和 15 个接收方，==**形成 Incast 场景**==。
+- **图 3A**: 实验设置示意图，展示了两个数据中心（DC1, DC2）通过多条链路连接，其中 DC2 存在一个**热点（Hotspot）**，接收来自 DC1 的 Intra-DC 流和 Inter-DC 流，==**形成 Incast 场景**==。
 - **图 3B**: 展示了 Gemini 协议在混合 Incast 场景下 Intra-DC 流和 Inter-DC 流的发送速率（Gbps）随时间（ms）的变化。
     - **X轴**: 时间（Time），单位为毫秒（ms）。
     - **Y轴**: 发送速率（Sending Rate），单位为 Gbps。
