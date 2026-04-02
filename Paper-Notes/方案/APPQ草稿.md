@@ -40,12 +40,6 @@
 
 **核心问题**：参数固定，无法适应动态流量
 
-| 参数     | Uno的设置                  | 问题                |
-| ------ | ----------------------- | ----------------- |
-| 幽灵队列容量 | 1.5×真实队列（固定）            | 轻负载时过度保守，重负载时保护不足 |
-| 排空速率   | 基于链路速度+10% slowdown（固定） | 无法根据拥塞程度调整        |
-| ECN阈值  | kmin=20%, kmax=80%（固定）  | 对所有流一视同仁，缺乏区分     |
-
 
 **实验验证**（初步测试）：
 - 场景1：Inter-DC流量占比从0%→100%变化
@@ -126,10 +120,170 @@ ECN阈值: 0.25MB → 0.19MB  ✅ 更早触发
 
 - **kmin/kmax调整**：才是真正控制ECN灵敏度的旋钮
 
-**2. 自适应调整**（EWMA平滑）
+**2. 自适应ECN阈值调整（Adaptive kmin/kmax）**
+**核心思路**
+Uno里`_phantom_kmin` 和 `_phantom_kmax` 是全局静态变量，固定为20/80。
+APPQ要做的是：**根据拥塞趋势动态调整这两个值**。
 
+**第一步**：定义拥塞趋势等级
+基于算法1（趋势检测器）的输出，定义5个等级：
 
 ```
+趋势等级 trend_level ∈ {-2, -1, 0, +1, +2}
+
++2: 加速恶化  (velocity > V_highAND acceleration > A_high)
++1: 稳定上升  (velocity > V_low)0: 稳定      (|velocity| ≤ V_low)
+-1: 缓慢缓解  (velocity < -V_low)
+-2: 快速缓解  (velocity < -V_high)
+```
+
+**第二步**：kmin/kmax的调整规则
+
+**基准值**（Uno的固定值）：
+
+```
+kmin_base = 20
+kmax_base = 80
+```
+
+**调整量**（根据趋势等级）：
+
+```
+trend = +2 (加速恶化):Δkmin = -7,  Δkmax = -15
+trend = +1 (稳定上升):  Δkmin = -4,  Δkmax = -8
+trend =  0 (稳定):Δkmin =  0,  Δkmax =  0
+trend = -1 (缓慢缓解):  Δkmin = +3,  Δkmax = +6
+trend = -2 (快速缓解):  Δkmin = +5,  Δkmax = +10
+```
+
+**效果对照**：
+
+| 趋势      | kmin | kmax | ECN阈值(绝对值)      | 含义        |
+| ------- | ---- | ---- | --------------- | --------- |
+| +2 加速恶化 | 13%  | 65%  | 0.16MB / 0.81MB | 最早触发，最强保护 |
+| +1 稳定上升 | 16%  | 72%  | 0.20MB / 0.90MB | 提前触发      |
+| 0 稳定    | 20%  | 80%  | 0.25MB / 1.00MB | Uno默认行为   |
+| -1 缓慢缓解 | 23%  | 86%  | 0.29MB / 1.08MB | 延迟触发，减少过标 |
+| -2 快速缓解 | 25%  | 90%  | 0.31MB / 1.13MB | 最晚触发，最少干预 |
+
+**第三步**：EWMA平滑，避免震荡
+
+直接跳变kmin/kmax会导致ECN标记率剧烈波动，用EWMA平滑：
+
+```
+目标值：kmin_target = kmin_base + Δkmin[trend_level]
+  kmax_target = kmax_base + Δkmax[trend_level]
+
+平滑更新（每100μs一次）：
+  kmin_adaptive = α × kmin_target + (1-α) × kmin_adaptive
+  kmax_adaptive = α × kmax_target + (1-α) × kmax_adaptive
+
+其中 α = 0.2（平滑系数）
+```
+
+**平滑效果示例**（从trend=0突变到trend=+2）：
+
+```
+t=0:   kmin=20.0,  kmax=80.0   (稳定)
+t=1:   kmin=18.6,  kmax=77.0   (开始下降)
+t=2:   kmin=17.5,  kmax=74.6
+t=3:   kmin=16.6,  kmax=72.7   
+t=4:   kmin=15.9,  kmax=71.2   
+t=5:   kmin=15.3,  kmax=70.0   (接近目标13/65)
+...逐渐收敛到 kmin=13, kmax=65
+```
+
+---
+
+ **第四步**：边界约束
+
+防止极端情况下参数越界：
+
+```
+kmin_adaptive = clamp(kmin_adaptive, 10, 30)
+kmax_adaptive = clamp(kmax_adaptive, 60, 90)
+
+同时保证间距：
+if (kmax_adaptive - kmin_adaptive) < 30:
+    kmax_adaptive = kmin_adaptive + 30
+```
+
+---
+
+### 完整算法伪代码
+
+```python
+# 初始化
+kmin_adaptive = 20.0   # 浮点数，用于EWMA计算
+kmax_adaptive = 80.0
+α = 0.2
+
+# 调整量表
+delta_kmin = {+2: -7, +1: -4, 0: 0, -1: +3, -2: +5}
+delta_kmax = {+2: -15, +1: -8, 0: 0, -1: +6, -2: +10}
+
+# 每100μs调用一次
+def update_thresholds(trend_level):
+    # 1. 计算目标值
+    kmin_target = 20 + delta_kmin[trend_level]
+    kmax_target = 80 + delta_kmax[trend_level]
+
+    # 2. EWMA平滑
+    kmin_adaptive = α × kmin_target + (1-α) × kmin_adaptive
+    kmax_adaptive = α × kmax_target + (1-α) × kmax_adaptive
+
+    # 3. 边界约束
+    kmin_adaptive = clamp(kmin_adaptive, 10, 30)
+    kmax_adaptive = clamp(kmax_adaptive, 60, 90)
+
+    # 4. 保证间距
+    if kmax_adaptive - kmin_adaptive < 30:
+        kmax_adaptive = kmin_adaptive + 30
+
+# ECN决策时使用（替换Uno第156-157行）
+def decide_ECN_phantom():
+    ecn_thresh_min = phantom_queue_size × kmin_adaptive / 100
+    ecn_thresh_max = phantom_queue_size × kmax_adaptive / 100
+
+    if current_phantom > ecn_thresh_max:
+        return True
+    elif current_phantom > ecn_thresh_min:
+        p = (current_phantom - ecn_thresh_min) / (ecn_thresh_max - ecn_thresh_min)
+        return random() < p
+    return False
+```
+
+---
+
+### 与Uno代码的对应关系
+
+Uno原来（第156-157行）：
+
+```cpp
+int _ecn_maxthresh_ph = _phantom_queue_size / 100 * _phantom_kmax;  // 固定80
+int _ecn_minthresh_ph = _phantom_queue_size / 100 * _phantom_kmin;  // 固定20
+```
+
+APPQ改为：
+
+```cpp
+int _ecn_maxthresh_ph = _phantom_queue_size / 100 * _kmax_adaptive;  // 动态
+int _ecn_minthresh_ph = _phantom_queue_size / 100 * _kmin_adaptive;  // 动态
+```
+
+**只改这两行**，其余ECN决策逻辑不变，改动最小。
+
+---
+
+### 设计亮点（论文里可以强调）
+
+1. **与Uno完全兼容**：trend=0时退化为Uno原始行为
+2. **改动极小**：只需替换两行代码
+3. **无额外信息需求**：只依赖算法1输出的trend_level
+4. **平滑无震荡**：EWMA保证参数平滑过渡
+5. **有理论上界**：kmin/kmax有边界约束，系统不会失控
+
+
 
 ### 2.3 关键优势
 
